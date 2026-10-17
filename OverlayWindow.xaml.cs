@@ -13,39 +13,16 @@ namespace UniversalRecorder
     public partial class OverlayWindow : Window
     {
         private bool isDrawingMode = false;
-        
         public OverlayWindow()
         {
             InitializeComponent();
-            DrawCanvas.DefaultDrawingAttributes = new DrawingAttributes 
-            { 
-                Color = Colors.Red, 
-                Width = 4, 
-                Height = 4, 
-                FitToCurve = true, 
-                StylusTip = StylusTip.Ellipse 
-            };
-            
-            this.KeyDown += OverlayWindow_KeyDown;
+            DrawCanvas.DefaultDrawingAttributes = new DrawingAttributes { Color = Colors.Red, Width = 4, Height = 4, FitToCurve = true, StylusTip = StylusTip.Ellipse };
+            this.KeyDown += (s, e) => { if (e.Key == Key.F8) ToggleDrawingMode(); };
         }
-
-        private void OverlayWindow_KeyDown(object sender, KeyEventArgs e)
-        {
-            if (e.Key == Key.F8)
-            {
-                ToggleDrawingMode();
-            }
-        }
-
-        private void ToggleDraw_Click(object sender, RoutedEventArgs e)
-        {
-            ToggleDrawingMode();
-        }
-
+        private void ToggleDraw_Click(object sender, RoutedEventArgs e) => ToggleDrawingMode();
         private void ToggleDrawingMode()
         {
             isDrawingMode = !isDrawingMode;
-            
             if (isDrawingMode)
             {
                 DrawCanvas.IsHitTestVisible = true;
@@ -63,20 +40,8 @@ namespace UniversalRecorder
                 ToggleDrawBtn.Foreground = new SolidColorBrush(Colors.Black);
             }
         }
-
-        // Wrapper methods for MainWindow compatibility
-        public void EnableDrawing()
-        {
-            this.Show();
-            this.Topmost = true;
-            if (!isDrawingMode) ToggleDrawingMode();
-        }
-
-        public void DisableDrawing()
-        {
-            if (isDrawingMode) ToggleDrawingMode();
-        }
-
+        public void EnableDrawing() { this.Show(); this.Topmost = true; if (!isDrawingMode) ToggleDrawingMode(); }
+        public void DisableDrawing() { if (isDrawingMode) ToggleDrawingMode(); }
         public void AddRipple(double x, double y)
         {
             Dispatcher.BeginInvoke(new Action(() =>
@@ -95,20 +60,10 @@ namespace UniversalRecorder
                 }
             }), DispatcherPriority.Normal);
         }
-
         private void DrawCanvas_MouseDown(object sender, MouseButtonEventArgs e) { }
         private void DrawCanvas_MouseMove(object sender, MouseEventArgs e) { }
         private void DrawCanvas_MouseUp(object sender, MouseButtonEventArgs e) { }
-
-        public void ClearAll() 
-        { 
-            DrawCanvas.Strokes.Clear(); 
-            EffectsCanvas.Children.Clear(); 
-        }
-        
-        private void Clear_Click(object sender, RoutedEventArgs e)
-        {
-            ClearAll();
-        }
+        public void ClearAll() { DrawCanvas.Strokes.Clear(); EffectsCanvas.Children.Clear(); }
+        private void Clear_Click(object sender, RoutedEventArgs e) => ClearAll();
     }
 }
