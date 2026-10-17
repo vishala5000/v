@@ -16,31 +16,24 @@ namespace UniversalRecorder
         private WindowTracker windowTracker;
         public string OutputPath { get; private set; }
         private bool autoZoom;
-        private Rectangle currentZoomRect;
+        private RectangleF currentZoomRectF;
         private string logFile;
 
         public Recorder(string outputPath, bool autoZoom, WindowTracker tracker)
         {
-            // Use Desktop folder (guaranteed to exist and be writable)
             string desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
             string timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
             OutputPath = Path.Combine(desktopPath, $"recording_{timestamp}.mp4");
             
             this.autoZoom = autoZoom;
             this.windowTracker = tracker;
-            
-            // Create log file for debugging
             logFile = Path.Combine(desktopPath, $"recorder_log_{timestamp}.txt");
             Log($"Output path: {OutputPath}");
         }
 
         private void Log(string message)
         {
-            try
-            {
-                File.AppendAllText(logFile, $"[{DateTime.Now:HH:mm:ss}] {message}\n");
-            }
-            catch { }
+            try { File.AppendAllText(logFile, $"[{DateTime.Now:HH:mm:ss}] {message}\n"); } catch { }
         }
 
         public void Start()
@@ -49,12 +42,11 @@ namespace UniversalRecorder
             if (string.IsNullOrEmpty(ffmpegPath))
             {
                 Log("ERROR: FFmpeg not found!");
-                throw new Exception("FFmpeg not found in app folder. Please ensure ffmpeg.exe is in the same directory as UniversalRecorder.exe.");
+                throw new Exception("FFmpeg not found in app folder.");
             }
             
             Log($"FFmpeg found at: {ffmpegPath}");
 
-            // Pipe raw BGR24 video at 1280x720, 30 FPS to FFmpeg
             string args = $"-y -f rawvideo -vcodec rawvideo -s 1280x720 -r 30 -pix_fmt bgr24 -i - " +
                           $"-c:v libx264 -preset ultrafast -crf 23 -pix_fmt yuv420p -movflags +faststart \"{OutputPath}\"";
             
@@ -97,7 +89,9 @@ namespace UniversalRecorder
             int stride = width * 3;
             byte[] buffer = new byte[stride * height];
             Rectangle screenRect = Screen.PrimaryScreen.Bounds;
-            currentZoomRect = screenRect;
+            
+            // Use float for smooth interpolation
+            currentZoomRectF = new RectangleF(screenRect.X, screenRect.Y, screenRect.Width, screenRect.Height);
             int frameCount = 0;
 
             Log($"Screen size: {screenRect.Width}x{screenRect.Height}");
@@ -106,13 +100,14 @@ namespace UniversalRecorder
             {
                 try
                 {
-                    Rectangle targetRect = screenRect;
+                    RectangleF targetRectF = new RectangleF(screenRect.X, screenRect.Y, screenRect.Width, screenRect.Height);
+                    
                     if (autoZoom && windowTracker != null && windowTracker.ActiveWindow != IntPtr.Zero)
                     {
                         var bounds = windowTracker.ActiveWindowBounds;
                         int padW = Math.Max(50, bounds.Width / 5);
                         int padH = Math.Max(50, bounds.Height / 5);
-                        targetRect = new Rectangle(
+                        targetRectF = new RectangleF(
                             Math.Max(0, bounds.X - padW),
                             Math.Max(0, bounds.Y - padH),
                             Math.Min(screenRect.Width - (bounds.X - padW), bounds.Width + padW * 2),
@@ -120,30 +115,39 @@ namespace UniversalRecorder
                         );
                     }
 
-                    currentZoomRect.X += (targetRect.X - currentZoomRect.X) / 8;
-                    currentZoomRect.Y += (targetRect.Y - currentZoomRect.Y) / 8;
-                    currentZoomRect.Width += (targetRect.Width - currentZoomRect.Width) / 8;
-                    currentZoomRect.Height += (targetRect.Height - currentZoomRect.Height) / 8;
+                    // Smooth lerp (10% per frame)
+                    currentZoomRectF.X += (targetRectF.X - currentZoomRectF.X) * 0.1f;
+                    currentZoomRectF.Y += (targetRectF.Y - currentZoomRectF.Y) * 0.1f;
+                    currentZoomRectF.Width += (targetRectF.Width - currentZoomRectF.Width) * 0.1f;
+                    currentZoomRectF.Height += (targetRectF.Height - currentZoomRectF.Height) * 0.1f;
 
-                    using (Bitmap frame = new Bitmap(width, height, PixelFormat.Format24bppRgb))
-                    using (Graphics g = Graphics.FromImage(frame))
+                    // Round to integer for GDI+
+                    Rectangle captureRect = Rectangle.Round(currentZoomRectF);
+
+                    // STEP 1: Capture screen into source bitmap
+                    using (Bitmap sourceBitmap = new Bitmap(captureRect.Width, captureRect.Height, PixelFormat.Format24bppRgb))
+                    using (Graphics sourceGraphics = Graphics.FromImage(sourceBitmap))
                     {
-                        g.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
-                        g.CopyFromScreen(currentZoomRect.X, currentZoomRect.Y, 0, 0, currentZoomRect.Size);
-                        g.DrawImage(frame, new Rectangle(0, 0, width, height), new Rectangle(0, 0, currentZoomRect.Width, currentZoomRect.Height), GraphicsUnit.Pixel);
-
-                        BitmapData bmpData = frame.LockBits(new Rectangle(0, 0, width, height), ImageLockMode.ReadOnly, PixelFormat.Format24bppRgb);
-                        System.Runtime.InteropServices.Marshal.Copy(bmpData.Scan0, buffer, 0, buffer.Length);
-                        frame.UnlockBits(bmpData);
+                        sourceGraphics.CopyFromScreen(captureRect.X, captureRect.Y, 0, 0, captureRect.Size);
+                        
+                        // STEP 2: Scale source bitmap into destination bitmap (1280x720)
+                        using (Bitmap destBitmap = new Bitmap(width, height, PixelFormat.Format24bppRgb))
+                        using (Graphics destGraphics = Graphics.FromImage(destBitmap))
+                        {
+                            destGraphics.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
+                            destGraphics.DrawImage(sourceBitmap, new Rectangle(0, 0, width, height), new Rectangle(0, 0, captureRect.Width, captureRect.Height), GraphicsUnit.Pixel);
+                            
+                            // STEP 3: Extract raw BGR24 bytes
+                            BitmapData bmpData = destBitmap.LockBits(new Rectangle(0, 0, width, height), ImageLockMode.ReadOnly, PixelFormat.Format24bppRgb);
+                            System.Runtime.InteropServices.Marshal.Copy(bmpData.Scan0, buffer, 0, buffer.Length);
+                            destBitmap.UnlockBits(bmpData);
+                        }
                     }
 
                     ffmpegProcess.StandardInput.BaseStream.Write(buffer, 0, buffer.Length);
                     frameCount++;
                     
-                    if (frameCount % 100 == 0)
-                    {
-                        Log($"Captured {frameCount} frames");
-                    }
+                    if (frameCount % 100 == 0) Log($"Captured {frameCount} frames");
                 }
                 catch (Exception ex)
                 {
@@ -151,7 +155,7 @@ namespace UniversalRecorder
                     break;
                 }
 
-                Thread.Sleep(33);
+                Thread.Sleep(33); // ~30 FPS
             }
             
             Log($"Capture loop ended. Total frames: {frameCount}");
@@ -162,11 +166,7 @@ namespace UniversalRecorder
             Log("Stop() called");
             isRecording = false;
             
-            if (captureThread != null)
-            {
-                captureThread.Join(2000);
-                Log("Capture thread joined");
-            }
+            if (captureThread != null) captureThread.Join(2000);
             
             if (ffmpegProcess != null && !ffmpegProcess.HasExited)
             {
@@ -174,9 +174,7 @@ namespace UniversalRecorder
                 ffmpegProcess.StandardInput.Close();
                 
                 if (ffmpegProcess.WaitForExit(5000))
-                {
                     Log($"FFmpeg exited with code: {ffmpegProcess.ExitCode}");
-                }
                 else
                 {
                     Log("FFmpeg did not exit in time, killing...");
@@ -184,7 +182,6 @@ namespace UniversalRecorder
                 }
             }
             
-            // Verify file was created
             if (File.Exists(OutputPath))
             {
                 var fileInfo = new FileInfo(OutputPath);
@@ -200,13 +197,8 @@ namespace UniversalRecorder
         {
             string local = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ffmpeg.exe");
             if (File.Exists(local)) return local;
-            
             foreach (string path in (Environment.GetEnvironmentVariable("PATH") ?? "").Split(Path.PathSeparator))
-            {
-                string fullPath = Path.Combine(path, "ffmpeg.exe");
-                if (File.Exists(fullPath)) return fullPath;
-            }
-            
+                if (File.Exists(Path.Combine(path, "ffmpeg.exe"))) return Path.Combine(path, "ffmpeg.exe");
             return "";
         }
     }
