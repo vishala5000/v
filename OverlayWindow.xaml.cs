@@ -26,7 +26,6 @@ namespace UniversalRecorder
                 StylusTip = StylusTip.Ellipse 
             };
             
-            // Register global hotkey F8 to toggle drawing
             this.KeyDown += OverlayWindow_KeyDown;
         }
 
@@ -49,8 +48,6 @@ namespace UniversalRecorder
             
             if (isDrawingMode)
             {
-                // ENABLE DRAWING: Make canvas catch mouse events
-                // We use 1/255 opacity black so it's hit-testable but visually invisible
                 DrawCanvas.IsHitTestVisible = true;
                 DrawCanvas.Background = new SolidColorBrush(Color.FromArgb(1, 0, 0, 0));
                 ToggleDrawBtn.Content = "🛑 Stop Drawing (F8)";
@@ -59,14 +56,25 @@ namespace UniversalRecorder
             }
             else
             {
-                // DISABLE DRAWING: Make canvas completely pass-through
-                // Mouse clicks will now go to Chrome, Word, etc.
                 DrawCanvas.IsHitTestVisible = false;
                 DrawCanvas.Background = Brushes.Transparent;
                 ToggleDrawBtn.Content = "✏️ Start Drawing (F8)";
                 ToggleDrawBtn.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#FF00d2ff"));
                 ToggleDrawBtn.Foreground = new SolidColorBrush(Colors.Black);
             }
+        }
+
+        // Wrapper methods for MainWindow compatibility
+        public void EnableDrawing()
+        {
+            this.Show();
+            this.Topmost = true;
+            if (!isDrawingMode) ToggleDrawingMode();
+        }
+
+        public void DisableDrawing()
+        {
+            if (isDrawingMode) ToggleDrawingMode();
         }
 
         public void AddRipple(double x, double y)
