@@ -4,7 +4,7 @@ using System.Windows.Controls;
 using System.Windows.Ink;
 using System.Windows.Input;
 using System.Windows.Media;
-using System.Windows.Media.Animation; // <-- ADDED THIS FIX
+using System.Windows.Media.Animation;
 using System.Windows.Shapes;
 using System.Windows.Threading;
 
@@ -12,25 +12,63 @@ namespace UniversalRecorder
 {
     public partial class OverlayWindow : Window
     {
-        private bool isDrawing = false, drawingEnabled = false;
+        private bool isDrawingMode = false;
+        
         public OverlayWindow()
         {
             InitializeComponent();
-            DrawCanvas.DefaultDrawingAttributes = new DrawingAttributes { Color = Colors.Red, Width = 4, Height = 4, FitToCurve = true, StylusTip = StylusTip.Ellipse };
+            DrawCanvas.DefaultDrawingAttributes = new DrawingAttributes 
+            { 
+                Color = Colors.Red, 
+                Width = 4, 
+                Height = 4, 
+                FitToCurve = true, 
+                StylusTip = StylusTip.Ellipse 
+            };
+            
+            // Register global hotkey F8 to toggle drawing
+            this.KeyDown += OverlayWindow_KeyDown;
         }
-        public void EnableDrawing()
+
+        private void OverlayWindow_KeyDown(object sender, KeyEventArgs e)
         {
-            drawingEnabled = true;
-            DrawCanvas.EditingMode = InkCanvasEditingMode.Ink;
-            DrawCanvas.Background = new SolidColorBrush(Color.FromArgb(1, 0, 0, 0));
-            this.Topmost = true;
+            if (e.Key == Key.F8)
+            {
+                ToggleDrawingMode();
+            }
         }
-        public void DisableDrawing()
+
+        private void ToggleDraw_Click(object sender, RoutedEventArgs e)
         {
-            drawingEnabled = false;
-            DrawCanvas.EditingMode = InkCanvasEditingMode.None;
-            DrawCanvas.Background = Brushes.Transparent;
+            ToggleDrawingMode();
         }
+
+        private void ToggleDrawingMode()
+        {
+            isDrawingMode = !isDrawingMode;
+            
+            if (isDrawingMode)
+            {
+                // ENABLE DRAWING: Make canvas catch mouse events
+                // We use 1/255 opacity black so it's hit-testable but visually invisible
+                DrawCanvas.IsHitTestVisible = true;
+                DrawCanvas.Background = new SolidColorBrush(Color.FromArgb(1, 0, 0, 0));
+                ToggleDrawBtn.Content = "🛑 Stop Drawing (F8)";
+                ToggleDrawBtn.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#FFdc3545"));
+                ToggleDrawBtn.Foreground = new SolidColorBrush(Colors.White);
+            }
+            else
+            {
+                // DISABLE DRAWING: Make canvas completely pass-through
+                // Mouse clicks will now go to Chrome, Word, etc.
+                DrawCanvas.IsHitTestVisible = false;
+                DrawCanvas.Background = Brushes.Transparent;
+                ToggleDrawBtn.Content = "✏️ Start Drawing (F8)";
+                ToggleDrawBtn.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#FF00d2ff"));
+                ToggleDrawBtn.Foreground = new SolidColorBrush(Colors.Black);
+            }
+        }
+
         public void AddRipple(double x, double y)
         {
             Dispatcher.BeginInvoke(new Action(() =>
@@ -49,9 +87,20 @@ namespace UniversalRecorder
                 }
             }), DispatcherPriority.Normal);
         }
-        private void DrawCanvas_MouseDown(object sender, MouseButtonEventArgs e) { if (drawingEnabled) { isDrawing = true; } }
+
+        private void DrawCanvas_MouseDown(object sender, MouseButtonEventArgs e) { }
         private void DrawCanvas_MouseMove(object sender, MouseEventArgs e) { }
-        private void DrawCanvas_MouseUp(object sender, MouseButtonEventArgs e) { isDrawing = false; }
-        public void ClearAll() { DrawCanvas.Strokes.Clear(); EffectsCanvas.Children.Clear(); }
+        private void DrawCanvas_MouseUp(object sender, MouseButtonEventArgs e) { }
+
+        public void ClearAll() 
+        { 
+            DrawCanvas.Strokes.Clear(); 
+            EffectsCanvas.Children.Clear(); 
+        }
+        
+        private void Clear_Click(object sender, RoutedEventArgs e)
+        {
+            ClearAll();
+        }
     }
 }
