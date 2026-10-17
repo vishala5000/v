@@ -19,6 +19,9 @@ namespace UniversalRecorder
             AudioPlayer.Initialize();
         }
         
+        private void Minimize_Click(object sender, RoutedEventArgs e) { this.WindowState = WindowState.Minimized; }
+        private void Close_Click(object sender, RoutedEventArgs e) { this.Close(); }
+        
         private void Record_Click(object sender, RoutedEventArgs e)
         {
             if (!isRecording)
@@ -26,32 +29,37 @@ namespace UniversalRecorder
                 try
                 {
                     string outputPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyVideos), $"recording_{DateTime.Now:yyyyMMdd_HHmmss}.mp4");
-                    recorder = new Recorder(outputPath, autoZoom);
-                    recorder.Start();
                     windowTracker = new WindowTracker();
                     windowTracker.Start();
+                    
+                    recorder = new Recorder(outputPath, autoZoom, windowTracker);
+                    recorder.Start();
+                    
                     mouseHook = new MouseHook();
                     mouseHook.LeftButtonDown += OnLeftDown;
                     mouseHook.Install();
+                    
                     isRecording = true;
                     RecordBtn.Content = "⏹ Stop Recording";
                     RecordBtn.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#FFdc3545"));
-                    StatusText.Text = "🔴 Recording...";
+                    StatusText.Text = "🔴 Recording... (Saving to Videos folder)";
                     StatusText.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#FFff4b4b"));
                 }
                 catch (Exception ex) { MessageBox.Show($"Error: {ex.Message}", "Recording Error"); }
             }
             else
             {
+                recorder?.Stop();
                 mouseHook?.Uninstall();
                 windowTracker?.Stop();
-                recorder?.Stop();
+                
                 isRecording = false;
                 RecordBtn.Content = "▶ Start Recording";
                 RecordBtn.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#FF28a745"));
-                StatusText.Text = "✅ Saved to Videos folder!";
+                StatusText.Text = "✅ Saved successfully!";
                 StatusText.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#FF28a745"));
-                if (recorder != null) MessageBox.Show($"Saved to:\n{recorder.OutputPath}", "Complete");
+                
+                if (recorder != null) MessageBox.Show($"Recording saved to:\n{recorder.OutputPath}", "Recording Complete");
             }
         }
         
