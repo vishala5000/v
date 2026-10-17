@@ -28,11 +28,10 @@ namespace UniversalRecorder
             {
                 try
                 {
-                    string outputPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyVideos), $"recording_{DateTime.Now:yyyyMMdd_HHmmss}.mp4");
                     windowTracker = new WindowTracker();
                     windowTracker.Start();
                     
-                    recorder = new Recorder(outputPath, autoZoom, windowTracker);
+                    recorder = new Recorder("", autoZoom, windowTracker);
                     recorder.Start();
                     
                     mouseHook = new MouseHook();
@@ -42,10 +41,14 @@ namespace UniversalRecorder
                     isRecording = true;
                     RecordBtn.Content = "⏹ Stop Recording";
                     RecordBtn.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#FFdc3545"));
-                    StatusText.Text = "🔴 Recording... (Saving to Videos folder)";
+                    StatusText.Text = "🔴 Recording... (Check Desktop for log file)";
                     StatusText.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#FFff4b4b"));
                 }
-                catch (Exception ex) { MessageBox.Show($"Error: {ex.Message}", "Recording Error"); }
+                catch (Exception ex) 
+                { 
+                    MessageBox.Show($"Error: {ex.Message}", "Recording Error"); 
+                    StatusText.Text = "❌ Error starting recording";
+                }
             }
             else
             {
@@ -56,10 +59,12 @@ namespace UniversalRecorder
                 isRecording = false;
                 RecordBtn.Content = "▶ Start Recording";
                 RecordBtn.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#FF28a745"));
-                StatusText.Text = "✅ Saved successfully!";
+                
+                string desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+                StatusText.Text = $"✅ Saved to Desktop!";
                 StatusText.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#FF28a745"));
                 
-                if (recorder != null) MessageBox.Show($"Recording saved to:\n{recorder.OutputPath}", "Recording Complete");
+                MessageBox.Show($"Recording saved to Desktop:\n{recorder.OutputPath}\n\nLog file also saved to Desktop for debugging.", "Recording Complete");
             }
         }
         
