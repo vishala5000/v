@@ -4,8 +4,20 @@
         WindowStyle="None" AllowsTransparency="True" Background="Transparent"
         Topmost="True" ShowInTaskbar="False" WindowState="Maximized" ResizeMode="NoResize">
     <Grid>
-        <InkCanvas x:Name="DrawCanvas" Background="Transparent" EditingMode="None"
+        <!-- IsHitTestVisible="False" by default: Mouse clicks pass through to desktop apps -->
+        <InkCanvas x:Name="DrawCanvas" Background="Transparent" IsHitTestVisible="False"
+                   EditingMode="Ink"
                    MouseDown="DrawCanvas_MouseDown" MouseMove="DrawCanvas_MouseMove" MouseUp="DrawCanvas_MouseUp"/>
         <Canvas x:Name="EffectsCanvas" Background="Transparent" IsHitTestVisible="False"/>
+        
+        <!-- Floating Toolbar (Always clickable) -->
+        <StackPanel Orientation="Horizontal" VerticalAlignment="Top" HorizontalAlignment="Center" Margin="0,20,0,0"
+                    Background="#CC1e1e2f" Padding="12,8" IsHitTestVisible="True">
+            <Button x:Name="ToggleDrawBtn" Content="✏️ Start Drawing (F8)" Click="ToggleDraw_Click" 
+                    Background="#FF00d2ff" Foreground="Black" FontWeight="Bold" Padding="12,6" Margin="5,0" BorderThickness="0" Cursor="Hand" FontSize="13"/>
+            <Button x:Name="ClearBtn" Content="🗑️ Clear All" Click="Clear_Click" 
+                    Background="#FFdc3545" Foreground="White" FontWeight="Bold" Padding="12,6" Margin="5,0" BorderThickness="0" Cursor="Hand" FontSize="13"/>
+            <TextBlock Text="Press F8 to toggle" Foreground="White" VerticalAlignment="Center" Margin="15,0,0,0" FontSize="12" Opacity="0.8"/>
+        </StackPanel>
     </Grid>
 </Window>
