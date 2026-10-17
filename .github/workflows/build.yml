@@ -1,50 +1,30 @@
 name: Build Universal Windows EXE
-
-on:
-  push:
-    branches: [ main, master ]
-  workflow_dispatch:
-
+on: [push, workflow_dispatch]
 jobs:
   build:
     runs-on: windows-latest
-    
     steps:
     - uses: actions/checkout@v4
-    
-    - name: Setup MSBuild
-      uses: microsoft/setup-msbuild@v1
-    
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x'
     - name: Download FFmpeg
       shell: pwsh
       run: |
-        Write-Host "Downloading FFmpeg..."
         Invoke-WebRequest -Uri "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip" -OutFile ffmpeg.zip
         Expand-Archive ffmpeg.zip -DestinationPath ffmpeg_temp -Force
-        $ffmpegDir = Get-ChildItem ffmpeg_temp | Select-Object -First 1
-        Copy-Item "$($ffmpegDir.FullName)/bin/ffmpeg.exe" -Destination . -Force
-        Remove-Item ffmpeg.zip
-        Remove-Item ffmpeg_temp -Recurse -Force
-        Write-Host "FFmpeg downloaded"
-    
-    - name: Restore NuGet packages
-      run: nuget restore UniversalRecorder.csproj
-    
-    - name: Build with MSBuild
-      run: msbuild UniversalRecorder.csproj /p:Configuration=Release /p:Platform=AnyCPU
-    
-    - name: Prepare release folder
+        $dir = Get-ChildItem ffmpeg_temp | Select-Object -First 1
+        Copy-Item "$($dir.FullName)/bin/ffmpeg.exe" -Destination . -Force
+        Remove-Item ffmpeg.zip, ffmpeg_temp -Recurse -Force
+    - name: Build and Publish
+      run: dotnet publish UniversalRecorder.csproj -c Release -f net472 -o publish
+    - name: Copy FFmpeg to Publish
       shell: pwsh
-      run: |
-        New-Item -ItemType Directory -Force -Path release
-        Copy-Item bin/Release/UniversalRecorder.exe release/ -Force
-        Copy-Item ffmpeg.exe release/ -Force
-        Write-Host "Release folder contents:"
-        Get-ChildItem release
-    
+      run: Copy-Item ffmpeg.exe publish/ -Force
     - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
-        name: UniversalRecorder-Windows
-        path: release/
+        name: UniversalRecorder
+        path: publish/
         retention-days: 30
