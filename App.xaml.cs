@@ -1,8 +1,2 @@
 using System.Windows;
-
-namespace UniversalRecorder
-{
-    public partial class App : Application
-    {
-    }
-}
+namespace UniversalRecorder { public partial class App : Application { } }
