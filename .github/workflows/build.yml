@@ -17,11 +17,11 @@ jobs:
         pip install -r requirements.txt
     - name: Build with PyInstaller
       run: |
-        pyinstaller --onefile --noconsole --name ScreenRecorder main.py
+        pyinstaller --onefile --noconsole --name ProRecorder main.py
         dir dist
     - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
-        name: ScreenRecorder-EXE
-        path: dist/ScreenRecorder.exe
+        name: ProRecorder-Advanced-EXE
+        path: dist/ProRecorder.exe
         retention-days: 5
